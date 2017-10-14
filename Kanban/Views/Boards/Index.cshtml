@@ -1,0 +1,509 @@
+﻿@model Kanban.ViewModels.BoardViewModel
+@using Kanban.Models
+@using Microsoft.AspNet.Identity;
+
+@{
+    ViewBag.Title = "Index";
+    Layout = "~/Views/Shared/_AppLayout.cshtml";
+}
+
+@functions
+{
+    public string SelectedBoard(int ID, int boardID)
+    {
+        if (ID == boardID)
+            return "yellow-light";
+        return "";
+    }
+
+    public string SelectedBoardDragHandle(int ID, int boardID)
+    {
+        if (ID == boardID)
+            return "yellow-light";
+        return "white";
+    }
+
+    public int NumberOfChildenSections(List<Section>
+    Sections, int ParentID)
+    {
+        return Sections.Where(s => s.ParentID == ParentID).Count();
+    }
+
+    public string Hide(bool Open)
+    {
+        if (Open)
+            return "";
+        return "hide";
+    }
+
+    public string HideMe(bool Open)
+    {
+        if (Open)
+            return "";
+        return "hideMe";
+    }
+
+    public string CommaSeperateList(List<string>
+        list)
+    {
+        // helper to display coma seperated list
+        string withCommas = "";
+        for (int i = 0; i < list.Count(); i++)
+        {
+            if (i == 0)
+            {
+                withCommas = list[i];
+            }
+            else if (i == list.Count() - 1)
+            {
+                withCommas = withCommas + list[i];
+            }
+            else
+            {
+                withCommas = withCommas + ", " + list[i];
+            }
+        }
+        return withCommas;
+    }
+
+    public string CardColor(Card.Color? Color)
+    {
+        // takes the enum on the card and return the css class for the color
+        if (Color == null)
+            return "yellow-light";
+        var ID = (int)Color.Value;
+        if (ID == 0) return "blue-light";
+        if (ID == 1) return "purple-light";
+        if (ID == 2) return "red-light";
+        if (ID == 3) return "pink-light";
+        if (ID == 4) return "deep-purple-light";
+        if (ID == 5) return "indigo-light";
+        if (ID == 6) return "light-blue-light";
+        if (ID == 7) return "cyan-light";
+        if (ID == 8) return "teal-light";
+        if (ID == 9) return "green-light";
+        if (ID == 10) return "light-green-light";
+        if (ID == 11) return "lime-light";
+        if (ID == 12) return "yellow-light";
+        if (ID == 13) return "amber-light";
+        if (ID == 14) return "orange-light";
+        if (ID == 15) return "deep-orange-light";
+        if (ID == 16) return "brown-light";
+        if (ID == 17) return "blue-grey-light";
+        return "yellow-light";
+    }
+
+}
+
+@helper cardForTable(Card c)
+        {
+    @*Function to display the card on the table*@
+    <div id="card_@(c.ID)" class="card @CardColor(c.CardColor)">
+        <div class="card-left">
+            <div class="card-header">
+                <h6 class="">
+                    <span class="button-small @CardColor(c.CardColor) rounded3"><i class="fa fa-ellipsis-v"></i><i class="fa fa-ellipsis-v"></i>&nbsp;@WebUtility.HtmlDecode(c.Title.Trim())</span>
+                </h6>
+            </div>
+            <p>@WebUtility.HtmlDecode(c.Content)</p>
+
+        </div>
+        <div class="card-right">
+            <a href='#' class="button-small @CardColor(c.CardColor) rounded3 pull-right" onclick="editCard(@c.ID, '@WebUtility.HtmlEncode(c.Title.Trim())', '@WebUtility.HtmlEncode(c.Content.Trim())', @(c.CardColor != null ? (int)c.CardColor : 0))"><i class="fa fa-pencil"></i></a>
+        </div>
+    </div>
+}
+@helper SectionTreeView(List<Section>
+            Sections, int ParentID)
+{
+    @*Function to display the list of sections.  Recursive for nested sections*@
+foreach (var item in Sections.Where(s => s.ParentID == ParentID))
+{
+    <li id="section_@(ParentID)_@(item.ID)">
+        @{var submenu = Sections.Where(s => s.ParentID == item.ID).Count();}
+        @Html.DisplayFor(modelItem => item.Title)
+        <ul>
+            @if (submenu > 0)
+            {
+                @SectionTreeView(Sections, item.ID)
+            }
+        </ul>
+    </li>
+            }
+}
+
+@helper SectionTreeViewEdit(List<Section>
+                Sections, int ParentID)
+{
+    @*Function to display the editible list of sections.  Recursive for nested sections*@
+if (Sections != null)
+{
+    foreach (var item in Sections.Where(s => s.ParentID == ParentID))
+    {
+        <li id="section_@(ParentID)_@(item.ID)">
+            @using (Html.BeginForm("Edit", "Sections"))
+            {
+                @Html.AntiForgeryToken()
+                @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+                @Html.HiddenFor(model => item.ID)
+                <span class="button-small teal-light rounded3"><i class="fa fa-ellipsis-v"></i><i class="fa fa-ellipsis-v"></i> Reorder</span>
+                if (item.Cards.Count() < 1)
+                {
+                    <a href="#" class="button-small teal-light rounded3" onclick="deleteSection(@item.ID, '@item.Title')"><i class="fa fa-trash"></i> Delete</a>
+                }
+                @Html.EditorFor(model => item.Title, new { htmlAttributes = new { @class = "form-control rounded3" } })
+                @Html.ValidationMessageFor(model => item.Title, "", new { @class = "text-danger" })
+                <input type="submit" value="Save" class="button-small blue-grey rounded3" />
+            }
+            @{var submenu = Sections.Where(s => s.ParentID == item.ID).Count();}
+            <ul class="sortable-sub-section" id="sortableSubSection_@(item.ID)">
+                @if (submenu > 0)
+                {
+                    @SectionTreeViewEdit(Sections, item.ID)
+                }
+            </ul>
+        </li>
+                    }
+                }
+}
+
+@helper TableHeader(List<Section>
+                    tableSections, List<Section>
+                        sections, int maxNumSubSections, int level)
+{
+    @*Function to display the header row of the table.  Recursive for nested sections*@
+    <tr>
+        @{var subSections = tableSections.OrderBy(t => t.Order);}
+        @foreach (var s in subSections)
+        {
+            var numChildrenSections = NumberOfChildenSections(sections.ToList(), s.ID);
+            if (numChildrenSections > 0)
+            {
+                <th colspan="@numChildrenSections">
+                    @s.Title
+                </th>
+            }
+            else
+            {
+                <th rowspan="@(maxNumSubSections - level)">
+                    @s.Title
+                </th>
+            }
+        }
+    </tr>
+}
+
+<div class="left col">
+    <div class="header row">
+        <em>Task That</em>
+    </div>
+    <div class="body row scroll-y sidebar">
+        <!-- Sidebar: board -->
+        <div class="sidebar-section">
+            <div class="sidebar-section-head toggleable">Boards <a href="#" onclick="event.preventDefault();event.stopPropagation();showPanel('edit-board-dialog-form')" class="pull-right button-small light-grey rounded3"><i class="fa fa-pencil"></i></a></div>
+            <div id="sidebar-section-content-main" class="sidebar-section-content">
+                @using (Html.BeginForm("Create", "Boards"))
+                {
+                    @Html.AntiForgeryToken()
+                    @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+                    <div id="add-board-wrapper" class="wrapper">
+                        <input id="add-board-input" name="Title" class="pull-left rounded3" type="text" /><input type="submit" id="add-board-button" class="pull-left button-small blue-grey rounded3" value="Add Board" />
+                    </div>
+                                        @Html.ValidationMessageFor(model => model.SelectedBoard.Title, "", new { @class = "text-danger" })
+                }
+                <div class="ui-helper-clearfix"></div>
+                @if (Model.ActiveSections != null && Model.Boards != null && Model.SectionTable != null && Model.SelectedBoard != null)
+                {
+                    <ul>
+                        @foreach (var item in Model.Boards)
+                        {
+                            <li id="board_@(item.ID)" class="@SelectedBoard(item.ID, Model.SelectedBoard.ID)">
+                                <a href="@Url.Action(" Index", "Boards" , new { id=item.ID })">@Html.DisplayFor(modelItem => item.Title)</a>
+                            </li>
+
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p>To get started, add a board.</p>
+                }
+            </div>
+        </div>
+        @if (Model.ActiveSections != null && Model.Boards != null && Model.SectionTable != null && Model.SelectedBoard != null)
+        {
+                                <!-- Sidebar: section -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-head toggleable">Sections <a href="#" onclick="event.preventDefault(); event.stopPropagation(); showPanel('edit-section-dialog-form')" class="pull-right button-small light-grey rounded3"><i class="fa fa-pencil"></i></a></div>
+                <div id="appSections" class="sidebar-section-content @HideMe(ViewBag.sectionOpen)">
+                    @using (Html.BeginForm("Create", "Sections"))
+                    {
+                        @Html.AntiForgeryToken()
+                        <input name="BoardID" type="hidden" value="@Model.SelectedBoard.ID" />
+                                        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+                                        <div id="add-section-wrapper" class="wrapper">
+                                            <input id="add-section-input" name="Title" class="pull-left rounded3" type="text" /><input type="submit" id="add-section-button" class="pull-left button-small blue-grey rounded3" value="Add Section" />
+                                        </div>
+                                        @Html.ValidationMessageFor(model => model.SelectedBoard.Title, "", new { @class = "text-danger" })
+                    }
+                    <div class="ui-helper-clearfix"></div>
+                    @if (Model.SelectedBoard.Sections.Count() > 0)
+                    {
+                        <ul>
+                            @SectionTreeView(Model.SelectedBoard.Sections.ToList(), 0)
+                        </ul>
+                    }
+                    else
+                    {
+                        <p>Add a section(s) to the board.</p>
+                    }
+
+                </div>
+            </div>
+        }
+    </div>
+    <div class="footer row">&copy; Loura Coons 2015</div>
+</div>
+<div id="mainBody" class="right col">
+    <div class="header row">
+
+        <div id="control-nav">
+            <a id="toggleBar" class="button-small teal rounded3" href="#" onclick="toggleSideBar();"><i class="fa fa-bars"></i></a>
+            @if (Model.ActiveSections != null && Model.Boards != null && Model.SectionTable != null && Model.SelectedBoard != null)
+            {
+                @Model.SelectedBoard.Title
+            }
+            <ul class="pull-right">
+                @using (Html.BeginForm("LogOff", "Account", FormMethod.Post, new { id = "logoutForm", @class = "navbar-right" }))
+                {
+                    @Html.AntiForgeryToken()
+                    <li>
+                        <a class="button-small teal rounded3" href="javascript:document.getElementById('logoutForm').submit()">Log off</a>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+    <div class="body row scroll-y">
+        @if (Model.ActiveSections != null && Model.Boards != null && Model.SectionTable != null && Model.SelectedBoard != null)
+        {
+            <div id="kanban-board" class="scroll-x tiles">
+                @if (!String.IsNullOrEmpty(ViewBag.errorMessage))
+                {
+                    <div id="ErrorBox" class="error-box red rounded3">
+                        <a href="#" onclick="$('#ErrorBox').hide();" class="pull-right button-small rounded3 red"><i class="fa fa-times"></i> Close</a>
+                        <p><b>@ViewBag.errorMessage</b></p>
+                    </div>
+                }
+                @if (Model.ActiveSections.FirstOrDefault() != null)
+                {
+                                    <!-- Quick entry for new card -->
+                    <p id="#create-card-sectionID-hidden" class="hidden">@Model.ActiveSections.FirstOrDefault().ID</p>
+                    using (Html.BeginForm("Create", "Cards", FormMethod.Post, new { id = "createCardForm" }))
+                    {
+                        @Html.AntiForgeryToken()
+                        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+                        <select name="SectionID" id="create-card-section">
+                            @foreach (var s in Model.ActiveSections)
+                            {
+                                <option value="@s.ID">@s.Title</option>
+                            }
+                        </select>
+                                    @Html.EditorFor(model => model.SelectedBoard.Sections.FirstOrDefault().Cards.FirstOrDefault().Title, new { htmlAttributes = new { @class = "form-control rounded3", id = "create-card-title", placeholder = "Title" } })
+                                    @Html.EditorFor(model => model.SelectedBoard.Sections.FirstOrDefault().Cards.FirstOrDefault().Content, new { htmlAttributes = new { @class = "form-control rounded3", id = "create-card-content", placeholder = "Content" } })
+                                    @Html.DropDownListFor(model => model.SelectedBoard.Sections.FirstOrDefault().Cards.FirstOrDefault().CardColor, Enum.GetValues(typeof(Card.Color)).Cast<Card.Color>
+                                        ().Select(x => new SelectListItem { Text = x.ToString(), Value = ((int)x).ToString() }), new { htmlAttributes = new { @class = "rounded3" } })
+                                    <input type="submit" value="Save" class="button-small blue-grey rounded3" id="create-card-button" />
+                                        <br />
+                                        @Html.ValidationMessageFor(model => model.SelectedBoard.Sections.FirstOrDefault().Cards.FirstOrDefault().Title, "", new { @class = "text-danger" })
+                                        @Html.ValidationMessageFor(model => model.SelectedBoard.Sections.FirstOrDefault().Cards.FirstOrDefault().Content, "", new { @class = "text-danger" })
+                    }
+                }
+                <table class="table1">
+                    @{int width = (Model.ActiveSections.Count() > 0) ? 99 / Model.ActiveSections.Count() : 100;}
+                    @foreach (var s in Model.ActiveSections)
+                    {
+                        <col style="width:@(width)%">
+                    }
+                    <thead>
+
+                        @{int i = 0;}
+                        @foreach (var t in Model.SectionTable)
+                        {
+                            @TableHeader(t.Row.OrderBy(r => r.Order).ToList(), Model.SelectedBoard.Sections.ToList(), Model.SectionTable.Count(), i)
+                            i++;
+                        }
+                    </thead>
+                    <tbody>
+                        <tr>
+                            @foreach (var s in Model.ActiveSections)
+                            {
+                                <td id="section_0&@(s.ID)" class="sortable">
+                                    @foreach (var c in s.Cards)
+                                    {
+                                        @cardForTable(c)
+                                    }
+                                </td>
+                            }
+                        </tr>
+
+                    </tbody>
+                </table>
+            </div>
+                            }
+    </div>
+
+    <!-- Edit board panel -->
+    <div id="edit-board-dialog-form" class="hiddenPanel @Hide(ViewBag.boardEditOpen)">
+        <div class="innerHeader">
+            <a class="button-small teal-light rounded3 pull-right" href="#" onclick="window.location = window.location.pathname"><i class="fa fa-times"></i> Close</a>
+        </div>
+        <div class="innerPanel">
+            <div style="padding:30px;">
+                <p><b>Reordering:</b> Click and hold on the reorder button and then drag to reorder your boards.</p>
+                <p><b>Delete:</b> To delete a board click the delete button.  This will also delete all cards associated with this board.  This action cannot be undone.</p>
+                <p><b>Copy:</b> To copy a board click the copy button.  This creates a copy of the board and sections.  Cards are not copied.</p>
+                <p><b>Rename:</b> To rename a board enter in a new name and click the save button.</p>
+                <hr />
+                @if (Model.ActiveSections != null && Model.Boards != null && Model.SectionTable != null && Model.SelectedBoard != null)
+                {
+                    <ul id="boardReOrder" class="sortable-board">
+                        @foreach (var item in Model.Boards)
+                        {
+                            <li id="board_@(item.ID)">
+                                @using (Html.BeginForm("Edit", "Boards"))
+                                {
+                                    @Html.AntiForgeryToken()
+                                    @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+                                    <span class="button-small rounded3 teal-light"><i class="fa fa-ellipsis-v"></i><i class="fa fa-ellipsis-v"></i> Reorder</span>
+                                    <a href="#" class="button-small teal-light rounded3" onclick="deleteBoard(@item.ID, '@item.Title')"><i class="fa fa-trash"></i> Delete</a>
+                                    <a href="@Url.Action(" Copy", "Boards" , new { BoardID=item.ID })" class="button-small teal-light rounded3"><i class="fa fa-copy"></i> Copy</a>
+                                    <input type="hidden" value="@item.ID" name="ID" />
+                                    <input type="text" value="@item.Title" name="Title" class="rounded3" />
+
+                                    @Html.ValidationMessageFor(model => model.SelectedBoard.Title, "", new { @class = "text-danger" })
+                                    <input type="submit" value="Save" class="button-small blue-grey rounded3" />
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="footer row"></div>
+</div>
+
+<!-- Edit section panel -->
+<div id="edit-section-dialog-form" class="hiddenPanel @Hide(ViewBag.sectionEditOpen)">
+    <div class="innerHeader">
+        <a class="button-small teal-light rounded3 pull-right" href="#" onclick="window.location = window.location.pathname"><i class="fa fa-times"></i> Close</a>
+    </div>
+    <div class="innerPanel">
+        <div style="padding:30px;">
+            <p><b>Reordering:</b> Click and hold on the reorder button and then drag to reorder your sections.  You can nest sections by moving them under another section.</p>
+            <p><b>Delete:</b> To delete a section click the delete button.  You cannot delete a section with cards in it.</p>
+            <p><b>Rename:</b> To rename a section enter in a new name and click the save button.</p>
+            <hr />
+            <ul id="sortableSubSection_0" class="sortable-section">
+                @if (Model.SelectedBoard != null)
+                {
+                    @SectionTreeViewEdit(Model.SelectedBoard.Sections.ToList(), 0)
+                }
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Edit card panel -->
+<div id="edit-card-dialog-form" class="hiddenPanel @Hide(ViewBag.cardEditOpen)">
+    <div class="innerHeader">
+        <a class="button-small teal-light rounded3 pull-right" href="#" onclick="window.location = window.location.pathname"><i class="fa fa-times"></i> Close</a>
+
+    </div>
+    <div class="innerPanel">
+        <div style="padding:30px;">
+            @using (Html.BeginForm("Edit", "Cards"))
+            {
+                @Html.AntiForgeryToken()
+                @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+                <input type="hidden" name="ID" value="" id="edit-card-id" />
+                                    <br />
+                                    <p><input type="text" name="Title" id="edit-card-title" value="" class="rounded3" /></p>
+                                    <textarea name="Content" id="edit-card-content" rows="15" cols="50" class="rounded3"></textarea>
+                                    <br />
+                                    <p><b>Card Color</b></p>
+                                    <p>@Html.DropDownListFor(model => model.SelectedBoard.Sections.FirstOrDefault().Cards.FirstOrDefault().CardColor, Enum.GetValues(typeof(Card.Color)).Cast<Card.Color>().Select(x => new SelectListItem { Text = x.ToString(), Value = ((int)x).ToString() }), new { id = "edit-card-color", @class = "rounded3" })</p>
+                                    <a href='#' class="button-small teal-light rounded3" onclick="deleteCard($('#edit-card-id').val(), $('#edit-card-title').val())"><i class="fa fa-trash"></i> Delete</a> <input type="submit" value="Save" class="button-small blue-grey rounded3" />
+
+            }
+        </div>
+    </div>
+</div>
+
+
+
+<div id="urls" class="hidden">
+    @if (Model.ActiveSections != null && Model.Boards != null && Model.SectionTable != null && Model.SelectedBoard != null)
+    {
+        <p id="selectedBoardID">@Model.SelectedBoard.ID</p>
+    }
+    <p id="reorderSectionsURL">@Url.Action("Reorder", "Sections")</p>
+    <p id="reorderBoardsURL">@Url.Action("Reorder", "Boards")</p>
+    <p id="reorderCardsURL">@Url.Action("Reorder", "Cards")</p>
+    <p id="reorderCategoriesURL">@Url.Action("Reorder", "Categories")</p>
+    <p id="copyBoardURL">@Url.Action("Copy", "Boards")</p>
+    <p id="copyCardURL">@Url.Action("Copy", "Cards")</p>
+</div>
+
+<!-- Delete a board confirmation -->
+<div id="delete-board-dialog-form" title="Delete Board">
+    @using (Html.BeginForm("Delete", "Boards"))
+    {
+        @Html.AntiForgeryToken()
+        <input type="hidden" value="" id="delete-id" name="ID" />
+                            <p>Are you sure you want to delete:</p>
+                            <div style="font-weight:bold;">
+                                <p id="delete-title"></p>
+                            </div>
+                            <p>This action cannot be undone.</p>
+                            <input type="button" value="Cancel" onclick="delete_dialog.dialog('close');" class="button-small blue-grey-light rounded3" />
+                            <input type="submit" value="Yes, delete this board" class="button-small red rounded3" />
+    }
+</div>
+
+<!-- Delete a section confirmation -->
+<div id="delete-section-dialog-form" title="Delete Section">
+    @using (Html.BeginForm("Delete", "Sections"))
+    {
+        @Html.AntiForgeryToken()
+        @Html.HiddenFor(model => model.SelectedBoard.Sections.FirstOrDefault().ID, new { id = "delete-section-id" })
+        <p>Are you sure you want to delete:</p>
+                            <div style="font-weight:bold;">
+                                <p id="delete-section-title"></p>
+                            </div>
+                            <p>This action cannot be undone.</p>
+                            <input type="button" value="Cancel" onclick="delete_section_dialog.dialog('close');" class="button-small blue-grey-light rounded3" />
+                            <input type="submit" value="Yes, delete this section" class="button-small red rounded3" />
+    }
+</div>
+
+<!-- Delete a card confirmation -->
+<div id="delete-card-dialog-form" title="Delete Card">
+    @using (Html.BeginForm("Delete", "Cards"))
+    {
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="ID" value="" id="delete-card-id" />
+                            <p>Are you sure you want to delete:</p>
+                            <div style="font-weight:bold;">
+                                <p id="delete-card-title"></p>
+                            </div>
+                            <p>This action cannot be undone.</p>
+                            <input type="button" value="Cancel" onclick="delete_card_dialog.dialog('close');" class="button-small blue-grey-light rounded3" />
+                            <input type="submit" value="Yes, delete this card" class="button-small red rounded3" />
+    }
+</div>
+
+@section Scripts {
+    @Scripts.Render("~/bundles/boards")
+}

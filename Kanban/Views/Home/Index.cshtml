@@ -1,0 +1,56 @@
+﻿@{
+    ViewBag.Title = "Kanban Board";
+}
+@using Microsoft.AspNet.Identity
+
+
+@if (Request.IsAuthenticated)
+{
+    using (Html.BeginForm("LogOff", "Account", FormMethod.Post, new { id = "logoutForm", @class = "navbar-right" }))
+    {
+        @Html.AntiForgeryToken()
+
+        <ul class="nav navbar-nav navbar-right">
+            <li>
+                @Html.ActionLink("Hello " + User.Identity.GetUserName() + "!", "Index", "Manage", routeValues: null, htmlAttributes: new { title = "Manage" })
+            </li>
+            <li>
+                @Html.ActionLink("My Boards", "Index", "Boards", routeValues: null, htmlAttributes: new { title = "Boards" })
+            </li>
+            <li><a href="javascript:document.getElementById('logoutForm').submit()">Log off</a></li>
+        </ul>
+    }
+}
+<div class="header clearfix">
+    <h3 class="text-muted">Kanban Board - Code Sample</h3>
+    <h4>By Loura Coons</h4>
+</div>
+
+<div class="jumbotron">
+    <p class="lead">Already a member?  @Html.ActionLink("Login Now", "Login", "Account", routeValues: null, htmlAttributes: new { id = "loginLink" })</p>
+    <p>Not registered? @Html.ActionLink("Register Now and Get Started!", "Register", "Account", routeValues: null, htmlAttributes: new { id = "registerLink" })</p>
+</div>
+
+<div class="row marketing">
+    <div class="col-lg-6">
+        <h4>C#, MVC5</h4>
+        <p>Built with .Net using MVC5 and C#.</p>
+        <br/>
+        <h4>Local Accounts</h4>
+        <p>Uses the built in account management</p>
+        <br />
+        <h4>JQuery UI</h4>
+        <p>Sortable cards are accomplished using Jquery UI sortable library.</p>
+    </div>
+
+    <div class="col-lg-6">
+        <h4>Boards</h4>
+        <p>Create boards to keep track of your tasks.</p>
+        <br />
+        <h4>Cards</h4>
+        <p>Add cards, re-order them, and delete them.</p>
+        <br />
+        <h4>Sections</h4>
+        <p>Add sections and nest them to create the perfect workflow.</p>
+    </div>
+</div>
